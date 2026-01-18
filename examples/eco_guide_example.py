@@ -1,3 +1,6 @@
+from mcp.server import Server  # Standard MCP server
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from north_mcp_python_sdk import NorthMCPServer
@@ -26,7 +29,20 @@ CLIMATIQ_API_KEY = os.getenv("CLIMATIQ_API_KEY")
 if not CLIMATIQ_API_KEY:
     print("Warning: CLIMATIQ_API_KEY not set. Carbon calculations will use fallback heuristics.")
 
-mcp = NorthMCPServer("EcoGuide MCP Server", host="0.0.0.0", port=_default_port)
+# Create FastAPI app
+app = FastAPI()
+standard_mcp = Server(app)  # Add this after creating app
+
+# Your existing NorthMCPServer
+mcp = NorthMCPServer("EcoGuide MCP Server", host="0.0.0.0", port=_default_port, app=app)
+
+@app.get("/.well-known/mcp/sse")
+async def mcp_sse(request: Request):
+    return StreamingResponse(standard_mcp.handle_sse(request), media_type="text/event-stream")
+
+@app.post("/.well-known/mcp/api")
+async def mcp_api(request: Request):
+    return await standard_mcp.handle_json_request(request)
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -340,9 +356,6 @@ def john_doe_notify_travel_completion(request: TravelCompletionRequest) -> dict:
 
 
 if __name__ == "__main__":
-    print("Starting EcoGuide MCP server with tools: john_doe_detect_travel_mode, john_doe_calculate_carbon_footprint, john_doe_translate_to_tangible_impact, john_doe_suggest_eco_alternatives, john_doe_notify_travel_completion")
-    print("Integrates with Climatiq.io for emissions and OpenStreetMap for location context.")
-    print("Set CLIMATIQ_API_KEY environment variable for real emissions data.")
-    print("Run with transport=streamable-http to connect from North.")
     mcp.run(transport="streamable-http")
+
 
