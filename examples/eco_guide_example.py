@@ -7,6 +7,7 @@ import requests
 import os
 from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
+import random
 
 """MCP server example exposing EcoGuide tools using firstname_lastname_ style names
 and Pydantic request models for safer input validation.
@@ -152,6 +153,13 @@ class SuggestAlternativesRequest(BaseModel):
     user_constraints: Optional[Dict] = None
 
 
+class TravelCompletionRequest(BaseModel):
+    locations: List[List[float]] = Field(..., description="List of [lat, lon] coordinates from the trip")
+    timestamps: List[str] = Field(..., description="ISO timestamps matching locations")
+    mode: Optional[str] = Field(None, description="Detected or provided travel mode")
+    distance_km: Optional[float] = Field(None, description="Trip distance in km")
+
+
 @mcp.tool(annotations={"requiresConsent": True})
 def john_doe_detect_travel_mode(request: DetectTravelRequest) -> dict:
     """Analyze GPS points to determine primary travel mode. Requires explicit consent."""
@@ -221,7 +229,7 @@ def john_doe_calculate_carbon_footprint(request: CalculateFootprintRequest) -> d
 
 @mcp.tool()
 def john_doe_translate_to_tangible_impact(request: TranslateImpactRequest) -> list:
-    """Convert `co2_kg` into 3–5 vivid analogies ranked by impact."""
+    """Convert `co2_kg` into a single vivid analogy selected based on environmental impact."""
     try:
         user = get_authenticated_user()
         print(f"john_doe_translate_to_tangible_impact called by: {user.email}")
@@ -229,11 +237,29 @@ def john_doe_translate_to_tangible_impact(request: TranslateImpactRequest) -> li
         print("john_doe_translate_to_tangible_impact called by unauthenticated user")
 
     co2_kg = request.co2_kg
-    return [
-        f"{co2_kg:.2f} kg CO₂ ≈ burning {co2_kg*0.5:.1f} kg of coal",
-        f"{co2_kg:.2f} kg CO₂ ≈ driving {co2_kg*3.0:.1f} km in an average car",
-        f"{co2_kg:.2f} kg CO₂ ≈ charging {int(co2_kg*100)} smartphones",
+    analogies = [
+        # Environmental impact (high)
+        f"🌳 That's equivalent to cutting down {co2_kg / 21:.1f} trees (each absorbs ~21kg CO2/year)",
+        f"🗑️ Like throwing away {co2_kg / 0.04:.0f} plastic bottles (each produces ~0.04kg CO2)",
+        
+        # Energy equivalents (medium)
+        f"⚡ Enough to power a laptop for {co2_kg / 0.008:.0f} hours of streaming",
+        f"🏠 Equivalent to {co2_kg / 2.5:.1f} hours of an average household's electricity",
+        
+        # Food equivalents (low)
+        f"🍔 Equal to the carbon footprint of {co2_kg / 2.5:.1f} hamburgers",
+        f"🥛 Like producing {co2_kg / 1.2:.1f} liters of milk",
     ]
+    
+    # Select category based on impact level
+    if co2_kg > 10:
+        category = analogies[:2]  # Environmental
+    elif co2_kg > 1:
+        category = analogies[2:4]  # Energy
+    else:
+        category = analogies[4:]  # Food
+    
+    return [random.choice(category)]
 
 
 @mcp.tool()
@@ -255,8 +281,66 @@ def john_doe_suggest_eco_alternatives(request: SuggestAlternativesRequest) -> li
     return alternatives
 
 
+@mcp.tool()
+def john_doe_notify_travel_completion(request: TravelCompletionRequest) -> dict:
+    """Generate a notification for completed travel, including carbon impact analogy."""
+    locations = request.locations
+    timestamps = request.timestamps
+    mode = request.mode
+    distance_km = request.distance_km
+
+    # If mode or distance not provided, detect them
+    if not mode or not distance_km:
+        if len(locations) >= 2 and len(timestamps) >= 2:
+            avg_speed = calculate_speed_kmh(locations, timestamps)
+            mode = infer_travel_mode(avg_speed)
+            distance_km = sum(haversine_distance(locations[i-1][0], locations[i-1][1], locations[i][0], locations[i][1]) 
+                            for i in range(1, len(locations)))
+        else:
+            return {"error": "insufficient_data", "message": "Need locations, timestamps, or provided mode/distance."}
+
+    # Calculate footprint
+    co2_kg = get_climatiq_emission(mode, distance_km)
+
+    # Get analogy (inline to avoid calling tool)
+    if co2_kg > 10:
+        category = [
+            f"🌳 That's equivalent to cutting down {co2_kg / 21:.1f} trees (each absorbs ~21kg CO2/year)",
+            f"🗑️ Like throwing away {co2_kg / 0.04:.0f} plastic bottles (each produces ~0.04kg CO2)",
+        ]
+    elif co2_kg > 1:
+        category = [
+            f"⚡ Enough to power a laptop for {co2_kg / 0.008:.0f} hours of streaming",
+            f"🏠 Equivalent to {co2_kg / 2.5:.1f} hours of an average household's electricity",
+        ]
+    else:
+        category = [
+            f"🍔 Equal to the carbon footprint of {co2_kg / 2.5:.1f} hamburgers",
+            f"🥛 Like producing {co2_kg / 1.2:.1f} liters of milk",
+        ]
+    analogy = random.choice(category)
+
+    # Get start/end locations
+    start_location = reverse_geocode(locations[0][0], locations[0][1]) if locations else "Unknown"
+    end_location = reverse_geocode(locations[-1][0], locations[-1][1]) if locations else "Unknown"
+
+    notification = {
+        "message": f"🚗 Travel completed! From {start_location} to {end_location} via {mode} ({distance_km:.1f} km).",
+        "carbon_impact": f"You produced {co2_kg:.2f} kg CO₂. {analogy}",
+        "suggestion": "Next time, consider biking or public transit to reduce your footprint!"
+    }
+
+    try:
+        user = get_authenticated_user()
+        print(f"john_doe_notify_travel_completion called by: {user.email}")
+    except Exception:
+        print("john_doe_notify_travel_completion called by unauthenticated user")
+
+    return notification
+
+
 if __name__ == "__main__":
-    print("Starting EcoGuide MCP server with tools: john_doe_detect_travel_mode, john_doe_calculate_carbon_footprint, john_doe_translate_to_tangible_impact, john_doe_suggest_eco_alternatives")
+    print("Starting EcoGuide MCP server with tools: john_doe_detect_travel_mode, john_doe_calculate_carbon_footprint, john_doe_translate_to_tangible_impact, john_doe_suggest_eco_alternatives, john_doe_notify_travel_completion")
     print("Integrates with Climatiq.io for emissions and OpenStreetMap for location context.")
     print("Set CLIMATIQ_API_KEY environment variable for real emissions data.")
     print("Run with transport=streamable-http to connect from North.")
