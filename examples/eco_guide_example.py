@@ -31,18 +31,17 @@ if not CLIMATIQ_API_KEY:
 
 # Create FastAPI app
 app = FastAPI()
-standard_mcp = Server(app)  # Add this after creating app
 
 # Your existing NorthMCPServer
 mcp = NorthMCPServer("EcoGuide MCP Server", host="0.0.0.0", port=_default_port, app=app)
+# Add this to the TOP of your eco_guide_example.py
+@app.get("/")
+async def root():
+    return {"status": "EcoGuide MCP server is running"}
 
-@app.get("/.well-known/mcp/sse")
-async def mcp_sse(request: Request):
-    return StreamingResponse(standard_mcp.handle_sse(request), media_type="text/event-stream")
-
-@app.post("/.well-known/mcp/api")
-async def mcp_api(request: Request):
-    return await standard_mcp.handle_json_request(request)
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 
 def haversine_distance(lat1, lon1, lat2, lon2):
