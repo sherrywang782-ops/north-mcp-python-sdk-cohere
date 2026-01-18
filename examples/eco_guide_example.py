@@ -19,7 +19,7 @@ Integrates with Climatiq.io for carbon calculations and OpenStreetMap for locati
 
 PROMPT_PATH = Path(__file__).parents[1] / "system_prompts" / "eco_guide.md"
 
-_default_port = 5222
+_default_port = 3002
 
 # API keys from environment
 CLIMATIQ_API_KEY = os.getenv("CLIMATIQ_API_KEY")
@@ -345,3 +345,4 @@ if __name__ == "__main__":
     print("Set CLIMATIQ_API_KEY environment variable for real emissions data.")
     print("Run with transport=streamable-http to connect from North.")
     mcp.run(transport="streamable-http")
+
