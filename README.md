@@ -28,7 +28,12 @@ There are 2 examples, one that uses the auth to get the user making the tool cal
 
 ### EcoGuide — Carbon Consciousness Agent
 
-This repository includes a system prompt for "EcoGuide", a carbon-consciousness agent that helps users understand and reduce transportation emissions. The system prompt is available at [system_prompts/eco_guide.md](system_prompts/eco_guide.md). An example usage script (examples/eco_guide_example.py) will demonstrate how to load the prompt and integrate with MCP tools for travel-mode detection, emissions calculation, and alternatives suggestions.
+This repository includes a system prompt for "EcoGuide", a carbon-consciousness agent that helps users understand and reduce transportation emissions. The system prompt is available at [system_prompts/eco_guide.md](system_prompts/eco_guide.md). An example usage script (examples/eco_guide_example.py) demonstrates how to load the prompt and integrate with MCP tools for travel-mode detection, emissions calculation, and alternatives suggestions.
+
+The example integrates with:
+
+- **Climatiq.io API** for accurate carbon footprint calculations (requires `CLIMATIQ_API_KEY` environment variable)
+- **OpenStreetMap Nominatim** for location context and reverse geocoding
 
 If you'd like, I can add the example usage script next to show how to call the MCP tools and chain results for a full EcoGuide flow.
 
